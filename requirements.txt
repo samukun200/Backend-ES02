@@ -2,3 +2,7 @@ django
 whitenoise
 psycopg2-binary
 python-dotenv
+
+djangorestframework
+markdown
+django-filter
