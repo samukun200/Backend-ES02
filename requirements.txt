@@ -6,3 +6,5 @@ python-dotenv
 djangorestframework
 markdown
 django-filter
+
+djangorestframework-simplejwt
