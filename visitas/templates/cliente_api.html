@@ -1,0 +1,181 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<main class="mx-auto max-w-4xl space-y-6 px-6 py-10">
+    <section class="rounded-2xl bg-white p-6 shadow-sm">
+        <h1 class="text-2xl font-bold text-slate-900">Cliente de API</h1>
+        <p class="mt-1 text-sm text-slate-600">
+            Inicia sesión para consumir el CRUD de visitas con JWT.
+        </p>
+        <form id="login-form" class="mt-5 grid gap-3 sm:grid-cols-3">
+            <input id="username" required placeholder="Usuario"
+                   class="rounded-lg border border-slate-300 px-3 py-2">
+            <input id="password" required type="password" placeholder="Contraseña"
+                   class="rounded-lg border border-slate-300 px-3 py-2">
+            <button class="rounded-lg bg-sky-600 px-4 py-2 font-semibold text-white">
+                Iniciar sesión
+            </button>
+        </form>
+        <p id="message" class="mt-3 text-sm" role="status"></p>
+    </section>
+
+    <section id="visitas-panel" class="hidden rounded-2xl bg-white p-6 shadow-sm">
+        <div class="flex items-center justify-between gap-4">
+            <h2 class="text-xl font-semibold text-slate-900">Visitas</h2>
+            <button id="logout-button" class="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                Cerrar sesión
+            </button>
+        </div>
+        <form id="visita-form" class="mt-5 grid gap-3 sm:grid-cols-2">
+            <input id="nombre" required placeholder="Nombre"
+                   class="rounded-lg border border-slate-300 px-3 py-2">
+            <input id="rut" required placeholder="RUT: 12345678-5"
+                   class="rounded-lg border border-slate-300 px-3 py-2">
+            <input id="hora-entrada" required type="time"
+                   class="rounded-lg border border-slate-300 px-3 py-2">
+            <input id="hora-salida" type="time"
+                   class="rounded-lg border border-slate-300 px-3 py-2">
+            <textarea id="motivo-visita" required placeholder="Motivo"
+                      class="rounded-lg border border-slate-300 px-3 py-2 sm:col-span-2"></textarea>
+            <button class="rounded-lg bg-emerald-600 px-4 py-2 font-semibold text-white sm:col-span-2">
+                Registrar visita
+            </button>
+        </form>
+        <ul id="visitas-list" class="mt-6 divide-y divide-slate-200"></ul>
+    </section>
+</main>
+
+<script>
+(() => {
+    const tokenKey = 'visitas_access_token';
+    const refreshKey = 'visitas_refresh_token';
+    const loginForm = document.querySelector('#login-form');
+    const visitaForm = document.querySelector('#visita-form');
+    const panel = document.querySelector('#visitas-panel');
+    const message = document.querySelector('#message');
+    const list = document.querySelector('#visitas-list');
+    let accessToken = sessionStorage.getItem(tokenKey);
+    let refreshToken = sessionStorage.getItem(refreshKey);
+
+    function showMessage(text, isError = false) {
+        message.textContent = text;
+        message.className = `mt-3 text-sm ${isError ? 'text-red-600' : 'text-emerald-600'}`;
+    }
+
+    async function requestToken(endpoint, body) {
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(body),
+        });
+        if (!response.ok) {
+            throw new Error('Las credenciales no son válidas.');
+        }
+        return response.json();
+    }
+
+    async function refreshAccessToken() {
+        if (!refreshToken) return false;
+        const response = await fetch('/api/token/refresh/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({refresh: refreshToken}),
+        });
+        if (!response.ok) return false;
+        const tokens = await response.json();
+        accessToken = tokens.access;
+        sessionStorage.setItem(tokenKey, accessToken);
+        return true;
+    }
+
+    async function apiFetch(url, options = {}, canRefresh = true) {
+        options.headers = {
+            ...(options.headers || {}),
+            Authorization: `Bearer ${accessToken}`,
+        };
+        let response = await fetch(url, options);
+        if (response.status === 401 && canRefresh && await refreshAccessToken()) {
+            return apiFetch(url, options, false);
+        }
+        return response;
+    }
+
+    function renderVisitas(visitas) {
+        list.replaceChildren();
+        visitas.forEach((visita) => {
+            const item = document.createElement('li');
+            item.className = 'py-3 text-sm text-slate-700';
+            item.textContent = `${visita.nombre} — ${visita.rut} — ${visita.motivo_visita}`;
+            list.appendChild(item);
+        });
+    }
+
+    async function loadVisitas() {
+        const response = await apiFetch('/api/visitas/');
+        if (!response.ok) throw new Error('No fue posible cargar las visitas.');
+        const data = await response.json();
+        renderVisitas(Array.isArray(data) ? data : data.results);
+    }
+
+    loginForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        try {
+            const tokens = await requestToken('/api/token/', {
+                username: document.querySelector('#username').value,
+                password: document.querySelector('#password').value,
+            });
+            accessToken = tokens.access;
+            refreshToken = tokens.refresh;
+            sessionStorage.setItem(tokenKey, accessToken);
+            sessionStorage.setItem(refreshKey, refreshToken);
+            panel.classList.remove('hidden');
+            showMessage('Sesión iniciada correctamente.');
+            await loadVisitas();
+        } catch (error) {
+            showMessage(error.message, true);
+        }
+    });
+
+    visitaForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const payload = {
+            nombre: document.querySelector('#nombre').value,
+            rut: document.querySelector('#rut').value,
+            hora_entrada: document.querySelector('#hora-entrada').value,
+            hora_salida: document.querySelector('#hora-salida').value || null,
+            motivo_visita: document.querySelector('#motivo-visita').value,
+        };
+        const response = await apiFetch('/api/visitas/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+            showMessage('Los datos de la visita no son válidos.', true);
+            return;
+        }
+        visitaForm.reset();
+        showMessage('Visita registrada correctamente.');
+        await loadVisitas();
+    });
+
+    document.querySelector('#logout-button').addEventListener('click', () => {
+        accessToken = null;
+        refreshToken = null;
+        sessionStorage.removeItem(tokenKey);
+        sessionStorage.removeItem(refreshKey);
+        panel.classList.add('hidden');
+        showMessage('Sesión cerrada.');
+    });
+
+    if (accessToken && refreshToken) {
+        panel.classList.remove('hidden');
+        loadVisitas().catch(() => {
+            sessionStorage.clear();
+            panel.classList.add('hidden');
+            showMessage('La sesión expiró. Inicia sesión nuevamente.', true);
+        });
+    }
+})();
+</script>
+{% endblock %}

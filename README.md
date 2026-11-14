@@ -7,6 +7,7 @@ La API usa JWT y requiere autenticación para las operaciones sobre visitas.
 - `POST /api/token/`: obtiene los tokens enviando `username` y `password`.
 - `POST /api/token/refresh/`: obtiene un nuevo access token usando `refresh`.
 - `/api/visitas/`: CRUD de visitas mediante el router de DRF.
+- `/cliente/`: cliente web integrado que consume la API usando JWT.
 
 Incluye el token en las solicitudes protegidas con:
 
@@ -16,6 +17,12 @@ Authorization: Bearer <access_token>
 
 Los orígenes permitidos se configuran mediante `CORS_ALLOWED_ORIGINS` en
 `.env`. Por defecto se permiten los clientes locales en el puerto `3000`.
+
+Para validar la API localmente:
+
+```powershell
+python manage.py test visitas.tests.VisitaApiTests --keepdb
+```
 
 ## Despliegue con Vercel y Supabase
 
