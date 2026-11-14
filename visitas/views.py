@@ -1,7 +1,15 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.utils import timezone
+from rest_framework import viewsets
+
 from .models import Visita
 from .forms import VisitaForm
+from .serializers import VisitaSerializer
+
+
+class VisitaViewSet(viewsets.ModelViewSet):
+    queryset = Visita.objects.all().order_by('-fecha_registro', '-hora_entrada')
+    serializer_class = VisitaSerializer
 
 def visitas_list(request):
     hoy = timezone.localdate()

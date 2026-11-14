@@ -2,3 +2,9 @@ django
 whitenoise
 psycopg2-binary
 python-dotenv
+djangorestframework
+djangorestframework-simplejwt
+django-cors-headers
+django-filter
+markdown
+dj-database-url
