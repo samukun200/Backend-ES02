@@ -35,7 +35,6 @@ ALLOWED_HOSTS = [
     for host in os.getenv(
         'ALLOWED_HOSTS',
         'localhost,127.0.0.1,backend-es-02.vercel.app',
-        'backend-es-02-4aslzmfvk-samuelteam1.vercel.app'
     ).split(',')
     if host.strip()
 ]
